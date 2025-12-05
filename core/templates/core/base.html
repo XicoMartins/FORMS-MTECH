@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Coleta de Produção{% endblock %}</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            background-color: #f5f5f5;
+        }
+        .container { 
+            max-width: 900px; 
+            margin: 30px auto; 
+            background: #fff;
+            padding: 20px 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            margin-top: 0;
+        }
+        label { 
+            display: block; 
+            margin-top: 10px; 
+            font-weight: bold;
+        }
+        input, select { 
+            width: 100%; 
+            padding: 8px; 
+            margin-top: 4px; 
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button { 
+            margin-top: 15px; 
+            padding: 10px 18px; 
+            border: none;
+            border-radius: 4px;
+            background-color: #1976d2;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #145ca3;
+        }
+        .messages { 
+            margin-bottom: 15px; 
+            color: #2e7d32; 
+            font-weight: bold;
+        }
+        .errorlist { 
+            color: #c62828; 
+            list-style: none; 
+            padding-left: 0; 
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <div>{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+</div>
+</body>
+</html>
