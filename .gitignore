@@ -23,3 +23,7 @@ output/*runtime*.log
 streamlit*.log
 streamlit*.err.log
 streamlit*.out.log
+
+output/*.csv
+FOTOS FUNCIONARIOS/
+.streamlit/
