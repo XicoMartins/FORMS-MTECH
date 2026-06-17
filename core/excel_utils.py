@@ -11,7 +11,9 @@ except Exception:
 
 # Cache simples em memoria para nao ficar lendo o Excel toda hora
 _DATA_CACHE = None
+_DATA_CACHE_SIGNATURE = None
 _OPERADORES_CACHE = None
+_OPERADORES_CACHE_SIGNATURE = None
 SHEET_ENV_NAME = "PLANILHA_PROCESSO_SHEET"
 
 
@@ -42,6 +44,21 @@ PREFERRED_FILENAMES = [
 ]
 EXCEL_PATTERN = "*.xlsx"
 OPERADORES_FILENAME = "LISTA DE OPERADORES.xlsx"
+REQUIRED_COLUMNS = {"CLIENTE", "ACABADO", "FERRAMENTAL", "PROCESSO"}
+
+
+def _build_paths_signature(paths: list[Path]) -> tuple:
+    """
+    Assinatura simples dos arquivos (caminho + mtime + tamanho)
+    para detectar mudancas e invalidar cache em memoria.
+    """
+    signature = []
+    for path in sorted(paths, key=lambda p: str(p).lower()):
+        if not path.exists():
+            continue
+        stat = path.stat()
+        signature.append((str(path.resolve()), stat.st_mtime_ns, stat.st_size))
+    return tuple(signature)
 
 
 def _resolve_excel_paths() -> list[Path]:
@@ -61,6 +78,8 @@ def _resolve_excel_paths() -> list[Path]:
 
         matches = sorted(folder.glob(EXCEL_PATTERN))
         for m in matches:
+            if m.name == OPERADORES_FILENAME:
+                continue
             if m not in found:
                 found.append(m)
 
@@ -117,12 +136,15 @@ def load_process_data():
     Le todas as planilhas encontradas e devolve uma lista de dicionarios:
     [{ 'CLIENTE': ..., 'ACABADO': ..., ... }, ...]
     """
-    global _DATA_CACHE
-    if _DATA_CACHE is not None:
+    global _DATA_CACHE, _DATA_CACHE_SIGNATURE
+    excel_paths = _resolve_excel_paths()
+    current_signature = _build_paths_signature(excel_paths)
+
+    if _DATA_CACHE is not None and _DATA_CACHE_SIGNATURE == current_signature:
         return _DATA_CACHE
 
     data = []
-    for excel_path in _resolve_excel_paths():
+    for excel_path in excel_paths:
         caminho_arquivo = os.path.abspath(excel_path)
         wb = load_workbook(caminho_arquivo, data_only=True)
         ws, rows = _pick_sheet(wb)
@@ -131,6 +153,16 @@ def load_process_data():
             continue
 
         headers = rows[0]
+        if not headers:
+            continue
+        normalized_headers = {
+            str(value).strip().upper()
+            for value in headers
+            if value not in (None, "")
+        }
+        if not REQUIRED_COLUMNS.issubset(normalized_headers):
+            # Evita planilhas que nao contem as colunas esperadas
+            continue
         for row in rows[1:]:
             if not any(row):  # linha totalmente vazia
                 continue
@@ -138,6 +170,7 @@ def load_process_data():
             data.append(item)
 
     _DATA_CACHE = data
+    _DATA_CACHE_SIGNATURE = current_signature
     return _DATA_CACHE
 
 
@@ -242,10 +275,7 @@ def get_operadores():
     Devolve a lista de nomes de operadores a partir do arquivo de operadores.
     Espera-se uma unica coluna com os nomes (a primeira linha pode ser cabecalho).
     """
-    global _OPERADORES_CACHE
-    if _OPERADORES_CACHE is not None:
-        return _OPERADORES_CACHE
-
+    global _OPERADORES_CACHE, _OPERADORES_CACHE_SIGNATURE
     # Procura primeiro na pasta planilhas, depois no BASE_DIR
     search_paths = [
         PLANILHAS_DIR / OPERADORES_FILENAME,
@@ -255,16 +285,28 @@ def get_operadores():
     if oper_path is None:
         raise FileNotFoundError(f"Nao encontrei {OPERADORES_FILENAME} em {PLANILHAS_DIR} ou {_get_base_dir()}")
 
+    current_signature = _build_paths_signature([oper_path])
+    if _OPERADORES_CACHE is not None and _OPERADORES_CACHE_SIGNATURE == current_signature:
+        return _OPERADORES_CACHE
+
     wb = load_workbook(oper_path, data_only=True)
     ws = wb.active
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
         _OPERADORES_CACHE = []
+        _OPERADORES_CACHE_SIGNATURE = current_signature
         return _OPERADORES_CACHE
 
-    # Assume primeira coluna, ignora cabecalho se for string
+    # Assume primeira coluna, ignora cabecalho se identificar titulo
     nomes = []
-    for value, *rest in rows:
+    start_index = 0
+    first_value = rows[0][0] if rows[0] else None
+    if isinstance(first_value, str):
+        header_value = first_value.strip().upper()
+        if "OPERADOR" in header_value or "OPERADORES" in header_value or "NOME" in header_value:
+            start_index = 1
+
+    for value, *rest in rows[start_index:]:
         if value is None:
             continue
         nome = str(value).strip()
@@ -273,4 +315,5 @@ def get_operadores():
         nomes.append(nome)
 
     _OPERADORES_CACHE = nomes
+    _OPERADORES_CACHE_SIGNATURE = current_signature
     return _OPERADORES_CACHE

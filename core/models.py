@@ -50,3 +50,38 @@ class ProductionRecord(models.Model):
 
     def __str__(self):
         return f"{self.display} | {self.machine} | {self.process} | {self.quantidade}"
+
+
+class ProductionEntry(models.Model):
+    import_key = models.CharField(max_length=500, null=True, blank=True, unique=True)
+    source_hash = models.CharField(max_length=64, editable=False, db_index=True)
+    schema_version = models.CharField(max_length=20, blank=True, default="")
+    timestamp = models.DateTimeField(db_index=True, null=True, blank=True)
+    cliente = models.CharField(max_length=255)
+    display = models.CharField(max_length=255)
+    numero_display = models.CharField(max_length=100, blank=True, default="")
+    maquinario = models.CharField(max_length=255)
+    processo = models.CharField(max_length=255)
+    data_producao = models.CharField(max_length=20, blank=True, default="")
+    operadores = models.TextField(blank=True, default="")
+    numero_operadores = models.PositiveIntegerField(null=True, blank=True)
+    hora_inicio = models.CharField(max_length=10, blank=True, default="")
+    hora_fim = models.CharField(max_length=10, blank=True, default="")
+    quantidade = models.PositiveIntegerField(default=0)
+    pecas_mortas = models.PositiveIntegerField(default=0)
+    quantidade_total = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("-timestamp", "-id")
+        verbose_name = "Registro de producao"
+        verbose_name_plural = "Registros de producao"
+
+    def __str__(self):
+        timestamp_display = (
+            self.timestamp.strftime("%d/%m/%Y %H:%M")
+            if self.timestamp
+            else "sem timestamp"
+        )
+        return (
+            f"{timestamp_display} | {self.cliente} | {self.display} | {self.processo}"
+        )
